@@ -166,6 +166,7 @@
       line-height: 1.1;
     }
     .time .cs { color: var(--muted); }
+    .time.hours { font-size: clamp(2.4rem, 12.5vw, 4.2rem); }
     .display { transition: background-color 0.25s; }
     .display.flash { background: rgba(255, 140, 50, 0.55); transition: none; }
     :root[data-theme="outdoor"] .display.flash { background: #ffe14d; }
@@ -195,7 +196,7 @@
     }
     .record-head, .laps li {
       display: grid;
-      grid-template-columns: 5.2rem 1fr 1fr;
+      grid-template-columns: 4.6rem minmax(0, 1fr) minmax(0, 1fr);
       gap: 8px;
       padding: 12px 16px;
       font-variant-numeric: tabular-nums;
@@ -217,8 +218,10 @@
       justify-content: space-between;
       align-items: center;
       padding: 6px 8px 6px 16px;
+      gap: 8px;
       font-size: 0.9rem;
       font-weight: 700;
+      word-break: keep-all;
       border-bottom: 1px solid var(--glass-border);
     }
     .record-bar button {
@@ -231,6 +234,7 @@
       font: inherit;
       cursor: pointer;
     }
+    .record-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .record-bar button:disabled { opacity: 0.55; cursor: default; }
     .laps {
       list-style: none;
@@ -240,7 +244,8 @@
       flex: 1;
     }
     .laps li {
-      font-size: 1.1rem;
+      align-items: start;
+      font-size: clamp(0.95rem, 4.4vw, 1.1rem);
       border-bottom: 1px solid var(--glass-border);
     }
     .laps li:last-child { border-bottom: none; }
@@ -257,9 +262,11 @@
       vertical-align: 2px;
     }
     .delta { font-size: 0.8em; font-weight: 600; margin-left: 4px; }
+    .laps .delta { display: block; margin-left: 0; }
     .delta.faster { color: var(--best); }
     .delta.slower { color: var(--worst); }
     .empty {
+      word-break: keep-all;
       margin: auto;
       padding: 16px;
       color: var(--muted);
@@ -304,7 +311,10 @@
 
     .toast {
       position: fixed;
-      left: 50%;
+      left: 16px;
+      right: 16px;
+      width: fit-content;
+      margin: 0 auto;
       bottom: calc(120px + env(safe-area-inset-bottom));
       z-index: 2;
       display: flex;
@@ -315,13 +325,12 @@
       background: #111;
       color: #fff;
       font-weight: 600;
-      max-width: calc(100vw - 32px);
-      white-space: nowrap;
-      transform: translateX(-50%);
+      word-break: keep-all;
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
     }
     .toast[hidden] { display: none; }
     .toast button {
+      flex-shrink: 0;
       min-height: 40px;
       padding: 0 14px;
       border: none;
@@ -482,7 +491,10 @@
     <section class="record glass" aria-label="랩 기록">
       <div class="record-bar">
         <span id="lap-count">랩 기록</span>
-        <button id="copy" type="button" disabled>기록 복사</button>
+        <span class="record-actions">
+          <button id="copy" type="button" disabled>복사</button>
+          <button id="csv" type="button" disabled>CSV 저장</button>
+        </span>
       </div>
       <div class="record-head" aria-hidden="true"><span>랩</span><span>랩 타임</span><span>누적</span></div>
       <ol class="laps" id="laps"></ol>
@@ -503,7 +515,7 @@
   </div>
 
   <script>
-    const STORE_KEY = "tokyo-stopwatch-v2";
+    const STORE_KEY = "tokyo-stopwatch-v3";
     const $ = (id) => document.getElementById(id);
     const timeEl = $("time");
     const currentLapEl = $("current-lap");
@@ -517,6 +529,7 @@
     const emptyEl = $("empty");
     const lapCountEl = $("lap-count");
     const copyBtn = $("copy");
+    const csvBtn = $("csv");
     const themeBtn = $("theme");
     const toastEl = $("toast");
     const toastMsg = $("toast-msg");
@@ -525,7 +538,6 @@
     // State. Split times are cumulative ms at each lap press.
     let running = false;
     let startTime = 0;   // performance.now() when the current run started
-    let startWall = 0;   // Date.now() at the same moment, for restoring after reload
     let sessionStart = 0; // Date.now() when this measurement was first started
     let elapsed = 0;     // ms accumulated before the current run
     let splits = [];
@@ -590,6 +602,7 @@
       const cs = displayCs();
       const p = clockParts(cs);
       timeEl.innerHTML = `${p.main}<span class="cs">${p.cs}</span>`;
+      timeEl.classList.toggle("hours", cs >= 360000);
       if (running || splits.length) {
         const sc = splitCs();
         const last = sc.length ? sc[sc.length - 1] : 0;
@@ -631,7 +644,7 @@
         ? `랩 ${laps.length}개 · 평균 ${mark(Math.round(laps.reduce((a, b) => a + b, 0) / laps.length))}`
         : "랩 기록";
       renderLastLap();
-      copyBtn.disabled = !running && elapsed === 0;
+      copyBtn.disabled = csvBtn.disabled = !running && elapsed === 0;
     }
 
     function pausedTail() {
@@ -673,10 +686,16 @@
       renderControls();
     }
 
+    // While the page is open, timing uses the monotonic performance.now(), so
+    // device clock changes have no effect. Only a reload needs wall-clock time:
+    // we checkpoint every second and, on reload, add just the gap since the last
+    // checkpoint. A clock change can therefore only affect that short gap.
     function save() {
       try {
         localStorage.setItem(STORE_KEY, JSON.stringify({
-          running, elapsed, splits, startWall, sessionStart,
+          running, splits, sessionStart,
+          elapsed: total(),
+          wall: Date.now(),
           theme: document.documentElement.dataset.theme || "",
         }));
       } catch (_) { /* storage unavailable: state just won't survive reload */ }
@@ -690,9 +709,16 @@
       elapsed = Number(s.elapsed) || 0;
       sessionStart = Number(s.sessionStart) || 0;
       splits = Array.isArray(s.splits) ? s.splits.map(Number) : [];
-      if (s.running && s.startWall) {
-        startWall = s.startWall;
-        startTime = performance.now() - Math.max(0, Date.now() - startWall);
+      if (s.running) {
+        const wall = Number(s.wall) || Date.now();
+        let gap = Date.now() - wall;
+        if (gap < 0) {
+          // Device clock moved backwards while the page was closed
+          gap = 0;
+          showToast("기기 시계가 바뀌어 새로고침하는 동안의 시간은 빠졌을 수 있어요", false);
+        }
+        elapsed += gap;
+        startTime = performance.now();
         running = true;
         requestWakeLock();
         tick();
@@ -719,8 +745,7 @@
     function start() {
       if (running) return;
       startTime = performance.now();
-      startWall = Date.now();
-      if (elapsed === 0) sessionStart = startWall;
+      if (elapsed === 0) sessionStart = Date.now();
       running = true;
       hideToast();
       tick();
@@ -732,7 +757,7 @@
 
     function stop() {
       if (!running) return;
-      undoState = { type: "stop", elapsed, startTime, startWall };
+      undoState = { type: "stop", elapsed, startTime };
       elapsed = total();
       running = false;
       cancelAnimationFrame(frame);
@@ -782,7 +807,6 @@
         // Resume as if stop was never pressed: the clock keeps the original start
         elapsed = u.elapsed;
         startTime = u.startTime;
-        startWall = u.startWall;
         running = true;
         tick();
         requestWakeLock();
@@ -816,18 +840,66 @@
       document.querySelector('meta[name="theme-color"]').content = outdoor ? "#ffffff" : "#070b1f";
     }
 
-    function recordText() {
+    function sessionDate() {
+      const d = new Date(sessionStart || Date.now());
+      return {
+        stamp: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
+        file: `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`,
+      };
+    }
+
+    // One row per lap (plus the unfinished segment while paused), in centiseconds
+    function recordRows() {
       const laps = lapCs();
       const sc = splitCs();
-      const now = new Date(sessionStart || Date.now());
-      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      const lines = [`측정 ${stamp}`, `총 기록 ${mark(recordCs(total()))}${running ? " (측정 중)" : ""}`];
-      if (laps.length) lines.push(`평균 랩 ${mark(Math.round(laps.reduce((a, b) => a + b, 0) / laps.length))}`);
-      lines.push("랩\t랩 타임\t누적");
-      laps.forEach((l, i) => lines.push(`${i + 1}\t${mark(l)}\t${mark(sc[i])}`));
+      const rows = laps.map((l, i) => ({ label: String(i + 1), lap: l, split: sc[i] }));
       const tail = pausedTail();
-      if (tail) lines.push(`${laps.length + 1}(정지)\t${mark(tail.lap)}\t${mark(tail.split)}`);
+      if (tail) rows.push({ label: `${laps.length + 1}(정지)`, lap: tail.lap, split: tail.split });
+      return rows;
+    }
+
+    function recordSummary() {
+      const laps = lapCs();
+      return {
+        total: recordCs(total()),
+        avg: laps.length ? Math.round(laps.reduce((a, b) => a + b, 0) / laps.length) : null,
+      };
+    }
+
+    function recordText() {
+      const { total: t, avg } = recordSummary();
+      const lines = [`측정 ${sessionDate().stamp}`, `총 기록 ${mark(t)}${running ? " (측정 중)" : ""}`];
+      if (avg !== null) lines.push(`평균 랩 ${mark(avg)}`);
+      lines.push("랩\t랩 타임\t누적");
+      recordRows().forEach((r) => lines.push(`${r.label}\t${mark(r.lap)}\t${mark(r.split)}`));
       return lines.join("\n");
+    }
+
+    // CSV keeps the athletics notation for reading and plain seconds for calculating
+    function recordCsv() {
+      const { total: t, avg } = recordSummary();
+      const sec = (cs) => (cs / 100).toFixed(2);
+      const lines = [
+        `측정 일시,${sessionDate().stamp}`,
+        `총 기록,${mark(t)},${sec(t)}${running ? ",측정 중" : ""}`,
+      ];
+      if (avg !== null) lines.push(`평균 랩,${mark(avg)},${sec(avg)}`);
+      lines.push("", "랩,랩 타임,누적,랩 타임(초),누적(초)");
+      recordRows().forEach((r) => lines.push(`${r.label},${mark(r.lap)},${mark(r.split)},${sec(r.lap)},${sec(r.split)}`));
+      return lines.join("\r\n");
+    }
+
+    function downloadCsv() {
+      // BOM so Excel opens Korean text as UTF-8
+      const blob = new Blob(["\uFEFF" + recordCsv()], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `stopwatch-${sessionDate().file}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      showToast("CSV 파일을 저장했어요", false);
     }
 
     async function copyRecord() {
@@ -849,6 +921,9 @@
     sideBtn.addEventListener("click", () => (running ? stop() : reset()));
     toastAction.addEventListener("click", undo);
     copyBtn.addEventListener("click", copyRecord);
+    csvBtn.addEventListener("click", downloadCsv);
+    setInterval(() => { if (running) save(); }, 1000);
+    window.addEventListener("pagehide", save);
     themeBtn.addEventListener("click", () => {
       setTheme(document.documentElement.dataset.theme === "outdoor" ? "" : "outdoor");
       save();
