@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070b1f">
   <title>도쿄타워 스탑워치</title>
   <style>
     :root {
@@ -10,15 +11,41 @@
       --sky-mid: #1b1f4a;
       --sky-low: #5a2d5e;
       --horizon: #c4573a;
+      --bg: var(--sky-top);
       --text: #fdf6ee;
-      --muted: rgba(253, 246, 238, 0.62);
-      --glass: rgba(12, 14, 36, 0.48);
-      --glass-border: rgba(255, 255, 255, 0.14);
+      --muted: rgba(253, 246, 238, 0.82);
+      --glass: rgba(10, 12, 32, 0.62);
+      --glass-border: rgba(255, 255, 255, 0.18);
       --accent: #ffb347;
-      --start: #5ef08a;
-      --stop: #ff6b5a;
+      --go: #1fa855;
+      --go-text: #ffffff;
+      --lap: #ff7a2f;
+      --lap-text: #1a0d00;
+      --stop: #e5483a;
+      --stop-text: #ffffff;
+      --neutral: rgba(255, 255, 255, 0.16);
+      --neutral-text: #ffffff;
       --best: #7dffa5;
-      --worst: #ff8a7a;
+      --worst: #ff9a8c;
+      --digit-weight: 300;
+    }
+    /* Outdoor mode: maximum contrast for direct sunlight */
+    :root[data-theme="outdoor"] {
+      --bg: #ffffff;
+      --text: #000000;
+      --muted: #262626;
+      --glass: #ffffff;
+      --glass-border: #000000;
+      --accent: #000000;
+      --go: #006b2c;
+      --lap: #000000;
+      --lap-text: #ffffff;
+      --stop: #b3140a;
+      --neutral: #e6e6e6;
+      --neutral-text: #000000;
+      --best: #006b2c;
+      --worst: #b3140a;
+      --digit-weight: 700;
     }
 
     * { box-sizing: border-box; }
@@ -27,12 +54,10 @@
 
     body {
       margin: 0;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      background: var(--sky-top);
+      background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      -webkit-tap-highlight-color: transparent;
     }
 
     /* Night-time Tokyo scene, fixed behind everything */
@@ -43,6 +68,7 @@
       overflow: hidden;
       background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-mid) 45%, var(--sky-low) 78%, var(--horizon) 100%);
     }
+    :root[data-theme="outdoor"] .scene { display: none; }
     .scene svg {
       position: absolute;
       left: 50%;
@@ -65,104 +91,255 @@
     main {
       position: relative;
       z-index: 1;
-      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100vh;
+      height: 100dvh;
       max-width: 480px;
-      padding: 40px 16px;
-    }
-
-    h1 {
-      margin: 0 0 20px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: var(--accent);
-      text-align: center;
-      letter-spacing: 0.18em;
-      text-shadow: 0 0 12px rgba(255, 140, 50, 0.6);
+      margin: 0 auto;
+      padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
     }
 
     .glass {
       background: var(--glass);
       border: 1px solid var(--glass-border);
-      border-radius: 24px;
-      backdrop-filter: blur(10px) saturate(140%);
-      -webkit-backdrop-filter: blur(10px) saturate(140%);
+      border-radius: 20px;
+      backdrop-filter: blur(12px) saturate(140%);
+      -webkit-backdrop-filter: blur(12px) saturate(140%);
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    @media (max-width: 360px) { h1 { display: none; } }
+    h1 {
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.14em;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .status::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .status[data-state="running"]::before { background: var(--go); box-shadow: 0 0 0 3px rgba(31, 168, 85, 0.35); }
+    .status[data-state="paused"]::before { background: var(--accent); border-radius: 2px; }
+
+    .theme-toggle {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
     }
 
     .display {
-      font-variant-numeric: tabular-nums;
-      font-size: clamp(3rem, 16vw, 5rem);
-      font-weight: 200;
+      padding: 14px 8px 12px;
       text-align: center;
-      padding: 20px 8px;
-      margin-bottom: 28px;
-      text-shadow: 0 0 24px rgba(255, 170, 90, 0.45);
     }
-    .display .ms { color: var(--muted); }
+    .time {
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(3.2rem, 17vw, 5.2rem);
+      font-weight: var(--digit-weight);
+      line-height: 1.1;
+    }
+    .time .cs { color: var(--muted); }
+    .display { transition: background-color 0.25s; }
+    .display.flash { background: rgba(255, 140, 50, 0.55); transition: none; }
+    :root[data-theme="outdoor"] .display.flash { background: #ffe14d; }
+    .last-lap {
+      margin-top: 6px;
+      font-size: 1.6rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      min-height: 1.3em;
+    }
+    .last-lap small { font-size: 0.6em; font-weight: 700; color: var(--muted); }
+    .current-lap {
+      margin-top: 2px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      min-height: 1.4em;
+    }
 
-    .controls {
+    .record {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .record-head, .laps li {
+      display: grid;
+      grid-template-columns: 5.2rem 1fr 1fr;
+      gap: 8px;
+      padding: 12px 16px;
+      font-variant-numeric: tabular-nums;
+    }
+    .record-head {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+      border-bottom: 1px solid var(--glass-border);
+      align-items: center;
+    }
+    .record-head span:not(:first-child), .laps li span:not(:first-child) { text-align: right; }
+    .copy {
+      grid-column: 1 / -1;
+      justify-self: end;
+    }
+    .record-bar {
       display: flex;
       justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 28px;
+      align-items: center;
+      padding: 6px 8px 6px 16px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--glass-border);
     }
-
-    button {
-      width: 88px;
-      height: 88px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      font: inherit;
-      font-size: 1rem;
-      font-weight: 500;
-      cursor: pointer;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      transition: opacity 0.15s, transform 0.1s;
-    }
-    button:active:not(:disabled) { transform: scale(0.95); }
-    button:disabled { opacity: 0.4; cursor: default; }
-    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-
-    #secondary {
-      background: var(--glass);
+    .record-bar button {
+      min-height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      background: transparent;
       color: var(--text);
-      border-color: var(--glass-border);
+      font: inherit;
+      cursor: pointer;
     }
-    #primary {
-      background: rgba(30, 90, 50, 0.55);
-      color: var(--start);
-      border-color: rgba(94, 240, 138, 0.35);
-    }
-    #primary.running {
-      background: rgba(110, 30, 25, 0.55);
-      color: var(--stop);
-      border-color: rgba(255, 107, 90, 0.35);
-    }
-
+    .record-bar button:disabled { opacity: 0.55; cursor: default; }
     .laps {
       list-style: none;
       margin: 0;
-      padding: 0 16px;
+      padding: 0;
+      overflow-y: auto;
+      flex: 1;
     }
-    .laps:empty { display: none; }
     .laps li {
-      display: flex;
-      justify-content: space-between;
-      padding: 14px 4px;
+      font-size: 1.1rem;
       border-bottom: 1px solid var(--glass-border);
-      font-variant-numeric: tabular-nums;
     }
     .laps li:last-child { border-bottom: none; }
-    .laps li.best { color: var(--best); }
-    .laps li.worst { color: var(--worst); }
+    .laps li.current { color: var(--muted); }
+    .laps li.best { color: var(--best); font-weight: 700; }
+    .laps li.worst { color: var(--worst); font-weight: 700; }
+    .badge {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 6px;
+      border: 1.5px solid currentColor;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      vertical-align: 2px;
+    }
+    .delta { font-size: 0.8em; font-weight: 600; margin-left: 4px; }
+    .delta.faster { color: var(--best); }
+    .delta.slower { color: var(--worst); }
+    .empty {
+      margin: auto;
+      padding: 16px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.95rem;
+    }
+
+    /* Thumb-zone controls at the bottom of the screen */
+    .controls {
+      display: flex;
+      gap: 20px;
+    }
+    .controls button {
+      min-height: 84px;
+      border: none;
+      border-radius: 22px;
+      font: inherit;
+      font-size: 1.35rem;
+      font-weight: 800;
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: transform 0.08s, filter 0.08s;
+    }
+    .controls button:active { transform: scale(0.97); filter: brightness(1.15); }
+    #side { flex: 1; }
+    #main-btn { flex: 2.4; }
+    .controls button small {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      opacity: 0.85;
+    }
+    #side[hidden] { display: none; }
+    [data-tone="go"] { background: var(--go); color: var(--go-text); }
+    [data-tone="lap"] { background: var(--lap); color: var(--lap-text); }
+    [data-tone="stop"] { background: var(--stop); color: var(--stop-text); }
+    [data-tone="neutral"] { background: var(--neutral); color: var(--neutral-text); border: 2px solid var(--glass-border) !important; }
+    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(120px + env(safe-area-inset-bottom));
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 10px 10px 18px;
+      border-radius: 14px;
+      background: #111;
+      color: #fff;
+      font-weight: 600;
+      max-width: calc(100vw - 32px);
+      white-space: nowrap;
+      transform: translateX(-50%);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+    }
+    .toast[hidden] { display: none; }
+    .toast button {
+      min-height: 40px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 10px;
+      background: #ffb347;
+      color: #000;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
 
     .hint {
-      margin-top: 20px;
+      margin: 0;
       font-size: 0.8rem;
       color: var(--muted);
       text-align: center;
-      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
     }
+    @media (pointer: coarse) { .hint { display: none; } }
     kbd {
       padding: 1px 6px;
       border: 1px solid var(--glass-border);
@@ -290,138 +467,412 @@
   </div>
 
   <main>
-    <h1>TOKYO TOWER · 스탑워치</h1>
+    <header>
+      <span class="status glass" id="status" role="status" data-state="idle">대기</span>
+      <h1>TOKYO TOWER</h1>
+      <button class="theme-toggle glass" id="theme" type="button" aria-pressed="false">☀ 야외 모드</button>
+    </header>
 
-    <div class="display glass" id="display" aria-live="off">00:00<span class="ms">.00</span></div>
+    <section class="display glass" aria-label="경과 시간">
+      <div class="time" id="time">00:00<span class="cs">.00</span></div>
+      <div class="last-lap" id="last-lap" aria-live="polite"></div>
+      <div class="current-lap" id="current-lap"></div>
+    </section>
 
-    <div class="controls">
-      <button id="secondary" type="button" disabled>랩</button>
-      <button id="primary" type="button">시작</button>
-    </div>
-
-    <ol class="laps glass" id="laps"></ol>
+    <section class="record glass" aria-label="랩 기록">
+      <div class="record-bar">
+        <span id="lap-count">랩 기록</span>
+        <button id="copy" type="button" disabled>기록 복사</button>
+      </div>
+      <div class="record-head" aria-hidden="true"><span>랩</span><span>랩 타임</span><span>누적</span></div>
+      <ol class="laps" id="laps"></ol>
+      <p class="empty" id="empty">측정 중에 <b>랩</b>을 누르면 여기에 기록돼요</p>
+    </section>
 
     <p class="hint"><kbd>Space</kbd> 시작/정지 · <kbd>L</kbd> 랩 · <kbd>R</kbd> 재설정</p>
+
+    <div class="controls">
+      <button id="side" type="button" hidden></button>
+      <button id="main-btn" type="button" data-tone="go">시작</button>
+    </div>
   </main>
 
-  <script>
-    const display = document.getElementById("display");
-    const primaryBtn = document.getElementById("primary");
-    const secondaryBtn = document.getElementById("secondary");
-    const lapList = document.getElementById("laps");
+  <div class="toast" id="toast" role="status" hidden>
+    <span id="toast-msg"></span>
+    <button id="toast-action" type="button" hidden>되돌리기</button>
+  </div>
 
+  <script>
+    const STORE_KEY = "tokyo-stopwatch-v2";
+    const $ = (id) => document.getElementById(id);
+    const timeEl = $("time");
+    const currentLapEl = $("current-lap");
+    const lastLapEl = $("last-lap");
+    const displayEl = document.querySelector(".display");
+    const MIN_LAP_MS = 400; // taps closer than this are treated as an accidental double tap
+    const statusEl = $("status");
+    const mainBtn = $("main-btn");
+    const sideBtn = $("side");
+    const lapList = $("laps");
+    const emptyEl = $("empty");
+    const lapCountEl = $("lap-count");
+    const copyBtn = $("copy");
+    const themeBtn = $("theme");
+    const toastEl = $("toast");
+    const toastMsg = $("toast-msg");
+    const toastAction = $("toast-action");
+
+    // State. Split times are cumulative ms at each lap press.
     let running = false;
     let startTime = 0;   // performance.now() when the current run started
+    let startWall = 0;   // Date.now() at the same moment, for restoring after reload
+    let sessionStart = 0; // Date.now() when this measurement was first started
     let elapsed = 0;     // ms accumulated before the current run
-    let lapStart = 0;    // total elapsed time when the current lap began
-    let laps = [];       // completed lap durations in ms
+    let splits = [];
     let frame = null;
+    let wakeLock = null;
+    let undoState = null;
+    let toastTimer = null;
 
     function total() {
       return running ? elapsed + (performance.now() - startTime) : elapsed;
     }
 
-    function format(ms) {
-      const cs = Math.floor(ms / 10) % 100;
-      const s = Math.floor(ms / 1000) % 60;
-      const m = Math.floor(ms / 60000) % 60;
-      const h = Math.floor(ms / 3600000);
-      const pad = (n) => String(n).padStart(2, "0");
-      const main = (h > 0 ? h + ":" : "") + pad(m) + ":" + pad(s);
-      return { main, cs: "." + pad(cs) };
+    // Recorded times are rounded up to the next 1/100 s (athletics rule);
+    // the running display truncates so it never shows a time not yet reached.
+    const recordCs = (ms) => Math.ceil(Math.round(ms * 1000) / 10000);
+    const liveCs = (ms) => Math.floor(ms / 10);
+    const pad = (n) => String(n).padStart(2, "0");
+
+    // Main display: fixed-width mm:ss.cc (h:mm:ss.cc past an hour)
+    function clockParts(cs) {
+      const h = Math.floor(cs / 360000);
+      const m = Math.floor(cs / 6000) % 60;
+      const s = Math.floor(cs / 100) % 60;
+      return { main: (h ? h + ":" : "") + pad(m) + ":" + pad(s), cs: "." + pad(cs % 100) };
     }
 
-    function render() {
-      const t = format(total());
-      display.innerHTML = `${t.main}<span class="ms">${t.cs}</span>`;
-      renderCurrentLap();
+    // Athletics notation: 12.34 / 1:05.32 / 1:02:03.45
+    function mark(cs) {
+      const h = Math.floor(cs / 360000);
+      const m = Math.floor(cs / 6000) % 60;
+      const s = Math.floor(cs / 100) % 60;
+      const frac = "." + pad(cs % 100);
+      if (h) return `${h}:${pad(m)}:${pad(s)}${frac}`;
+      if (m) return `${m}:${pad(s)}${frac}`;
+      return `${s}${frac}`;
+    }
+
+    const splitCs = () => splits.map(recordCs);
+    function lapCs() {
+      const sc = splitCs();
+      return sc.map((v, i) => v - (i ? sc[i - 1] : 0));
+    }
+    const displayCs = () => (running ? liveCs(total()) : recordCs(total()));
+
+    function deltaHtml(cur, prev) {
+      if (prev === undefined) return "";
+      const d = cur - prev;
+      if (d === 0) return `<span class="delta">±0.00</span>`;
+      const cls = d < 0 ? "faster" : "slower";
+      const word = d < 0 ? "빠름" : "느림";
+      return `<span class="delta ${cls}" aria-label="직전보다 ${mark(Math.abs(d))}초 ${word}">${d < 0 ? "−" : "+"}${mark(Math.abs(d))}</span>`;
+    }
+
+    function renderLastLap() {
+      const laps = lapCs();
+      if (!laps.length) { lastLapEl.innerHTML = ""; return; }
+      const n = laps.length;
+      lastLapEl.innerHTML = `<small>직전 랩 ${n}</small> ${mark(laps[n - 1])}${deltaHtml(laps[n - 1], laps[n - 2])}`;
+    }
+
+    function renderTime() {
+      const cs = displayCs();
+      const p = clockParts(cs);
+      timeEl.innerHTML = `${p.main}<span class="cs">${p.cs}</span>`;
+      if (running || splits.length) {
+        const sc = splitCs();
+        const last = sc.length ? sc[sc.length - 1] : 0;
+        const state = running ? "진행 중" : "정지됨";
+        currentLapEl.textContent = `랩 ${splits.length + 1} ${state} · ${mark(Math.max(0, cs - last))}`;
+      } else {
+        currentLapEl.textContent = "";
+      }
     }
 
     function tick() {
-      render();
+      renderTime();
       frame = requestAnimationFrame(tick);
     }
 
-    function renderCurrentLap() {
-      const current = lapList.querySelector("li.current");
-      if (current) {
-        const t = format(total() - lapStart);
-        current.lastElementChild.textContent = t.main + t.cs;
-      }
-    }
-
     function renderLaps() {
-      lapList.innerHTML = "";
-      if (!running && elapsed === 0) return;
-
+      const laps = lapCs();
+      const sc = splitCs();
       const rows = [];
-      const t = format(total() - lapStart);
-      rows.push(`<li class="current"><span>랩 ${laps.length + 1}</span><span>${t.main}${t.cs}</span></li>`);
-
-      const best = laps.length >= 2 ? Math.min(...laps) : null;
-      const worst = laps.length >= 2 ? Math.max(...laps) : null;
+      let best = null, worst = null;
+      if (laps.length >= 2) {
+        const min = Math.min(...laps), max = Math.max(...laps);
+        if (min !== max) { best = laps.indexOf(min); worst = laps.indexOf(max); }
+      }
+      // While paused, show the unfinished segment so the table adds up to the total
+      const tail = pausedTail();
+      if (tail) {
+        rows.push(`<li class="current" aria-label="랩 ${laps.length + 1} 정지됨, ${mark(tail.lap)}, 누적 ${mark(tail.split)}"><span>${laps.length + 1}<span class="badge">정지</span></span><span>${mark(tail.lap)}</span><span>${mark(tail.split)}</span></li>`);
+      }
       for (let i = laps.length - 1; i >= 0; i--) {
-        const f = format(laps[i]);
-        const cls = laps[i] === best ? "best" : laps[i] === worst ? "worst" : "";
-        rows.push(`<li class="${cls}"><span>랩 ${i + 1}</span><span>${f.main}${f.cs}</span></li>`);
+        const cls = i === best ? "best" : i === worst ? "worst" : "";
+        const tag = i === best ? "빠름" : i === worst ? "느림" : "";
+        const badge = tag ? `<span class="badge">${tag}</span>` : "";
+        rows.push(`<li class="${cls}" aria-label="랩 ${i + 1}${tag ? " " + tag : ""}, 랩 타임 ${mark(laps[i])}, 누적 ${mark(sc[i])}"><span>${i + 1}${badge}</span><span>${mark(laps[i])}${deltaHtml(laps[i], laps[i - 1])}</span><span>${mark(sc[i])}</span></li>`);
       }
       lapList.innerHTML = rows.join("");
+      emptyEl.hidden = laps.length > 0;
+      lapCountEl.textContent = laps.length
+        ? `랩 ${laps.length}개 · 평균 ${mark(Math.round(laps.reduce((a, b) => a + b, 0) / laps.length))}`
+        : "랩 기록";
+      renderLastLap();
+      copyBtn.disabled = !running && elapsed === 0;
     }
 
-    function updateButtons() {
-      primaryBtn.textContent = running ? "정지" : "시작";
-      primaryBtn.classList.toggle("running", running);
-      secondaryBtn.textContent = running || elapsed === 0 ? "랩" : "재설정";
-      secondaryBtn.disabled = !running && elapsed === 0;
+    function pausedTail() {
+      if (running || !splits.length) return null;
+      const sc = splitCs();
+      const split = recordCs(elapsed);
+      const lap = split - sc[sc.length - 1];
+      return lap > 0 ? { lap, split } : null;
     }
 
-    function toggle() {
+    function setButton(btn, label, tone, sub) {
+      btn.innerHTML = sub ? `${label}<small>${sub}</small>` : label;
+      btn.dataset.tone = tone;
+    }
+
+    function renderControls() {
+      const idle = !running && elapsed === 0;
       if (running) {
-        elapsed = total();
-        running = false;
-        cancelAnimationFrame(frame);
-        render();
+        setButton(mainBtn, "랩", "lap", "구간 기록");
+        setButton(sideBtn, "정지", "stop", "시간 멈춤");
+        statusEl.textContent = "측정 중";
+        statusEl.dataset.state = "running";
+      } else if (idle) {
+        setButton(mainBtn, "시작", "go");
+        statusEl.textContent = "대기";
+        statusEl.dataset.state = "idle";
       } else {
-        startTime = performance.now();
+        setButton(mainBtn, "계속", "go", "이어서 측정");
+        setButton(sideBtn, "재설정", "neutral", "기록 지움");
+        statusEl.textContent = "일시정지";
+        statusEl.dataset.state = "paused";
+      }
+      sideBtn.hidden = idle;
+    }
+
+    function renderAll() {
+      renderTime();
+      renderLaps();
+      renderControls();
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify({
+          running, elapsed, splits, startWall, sessionStart,
+          theme: document.documentElement.dataset.theme || "",
+        }));
+      } catch (_) { /* storage unavailable: state just won't survive reload */ }
+    }
+
+    function restore() {
+      let s;
+      try { s = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (_) { s = null; }
+      if (!s) return;
+      if (s.theme) setTheme(s.theme);
+      elapsed = Number(s.elapsed) || 0;
+      sessionStart = Number(s.sessionStart) || 0;
+      splits = Array.isArray(s.splits) ? s.splits.map(Number) : [];
+      if (s.running && s.startWall) {
+        startWall = s.startWall;
+        startTime = performance.now() - Math.max(0, Date.now() - startWall);
         running = true;
-        renderLaps();
+        requestWakeLock();
         tick();
       }
-      updateButtons();
+    }
+
+    function buzz(pattern) {
+      if (navigator.vibrate) navigator.vibrate(pattern);
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ("wakeLock" in navigator && !wakeLock && document.visibilityState === "visible") {
+          wakeLock = await navigator.wakeLock.request("screen");
+          wakeLock.addEventListener("release", () => { wakeLock = null; });
+        }
+      } catch (_) { wakeLock = null; }
+    }
+    function releaseWakeLock() {
+      if (wakeLock) wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+
+    function start() {
+      if (running) return;
+      startTime = performance.now();
+      startWall = Date.now();
+      if (elapsed === 0) sessionStart = startWall;
+      running = true;
+      hideToast();
+      tick();
+      requestWakeLock();
+      buzz(40);
+      renderAll();
+      save();
+    }
+
+    function stop() {
+      if (!running) return;
+      undoState = { type: "stop", elapsed, startTime, startWall };
+      elapsed = total();
+      running = false;
+      cancelAnimationFrame(frame);
+      releaseWakeLock();
+      buzz([40, 60, 40]);
+      renderAll();
+      save();
+      showToast("시간을 멈췄어요", true);
     }
 
     function lap() {
       if (!running) return;
       const now = total();
-      laps.push(now - lapStart);
-      lapStart = now;
+      // Ignore a second tap that lands within the same 1/100 s as the previous split
+      if (splits.length && now - splits[splits.length - 1] < MIN_LAP_MS) return;
+      if (!splits.length && now < MIN_LAP_MS) return;
+      splits.push(now);
+      buzz(25);
+      flash();
       renderLaps();
+      lapList.scrollTop = 0;
+      save();
     }
 
     function reset() {
-      if (running) return;
+      if (running || (elapsed === 0 && !splits.length)) return;
+      undoState = { type: "reset", elapsed, splits: splits.slice(), sessionStart };
       elapsed = 0;
-      lapStart = 0;
-      laps = [];
-      render();
-      renderLaps();
-      updateButtons();
+      sessionStart = 0;
+      splits = [];
+      renderAll();
+      save();
+      showToast("기록을 지웠어요", true);
     }
 
-    primaryBtn.addEventListener("click", toggle);
-    secondaryBtn.addEventListener("click", () => (running ? lap() : reset()));
+    function flash() {
+      displayEl.classList.add("flash");
+      setTimeout(() => displayEl.classList.remove("flash"), 180);
+    }
+
+    function undo() {
+      if (!undoState || running) return;
+      const u = undoState;
+      undoState = null;
+      hideToast();
+      if (u.type === "stop") {
+        // Resume as if stop was never pressed: the clock keeps the original start
+        elapsed = u.elapsed;
+        startTime = u.startTime;
+        startWall = u.startWall;
+        running = true;
+        tick();
+        requestWakeLock();
+      } else {
+        elapsed = u.elapsed;
+        splits = u.splits;
+        sessionStart = u.sessionStart;
+      }
+      renderAll();
+      save();
+    }
+
+    function showToast(msg, withUndo) {
+      toastMsg.textContent = msg;
+      toastAction.hidden = !withUndo;
+      toastEl.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, withUndo ? 6000 : 2000);
+    }
+    function hideToast() {
+      toastEl.hidden = true;
+      if (toastAction.hidden === false) undoState = null;
+    }
+
+    function setTheme(theme) {
+      const outdoor = theme === "outdoor";
+      if (outdoor) document.documentElement.dataset.theme = "outdoor";
+      else delete document.documentElement.dataset.theme;
+      themeBtn.setAttribute("aria-pressed", String(outdoor));
+      themeBtn.textContent = outdoor ? "☾ 야경 모드" : "☀ 야외 모드";
+      document.querySelector('meta[name="theme-color"]').content = outdoor ? "#ffffff" : "#070b1f";
+    }
+
+    function recordText() {
+      const laps = lapCs();
+      const sc = splitCs();
+      const now = new Date(sessionStart || Date.now());
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const lines = [`측정 ${stamp}`, `총 기록 ${mark(recordCs(total()))}${running ? " (측정 중)" : ""}`];
+      if (laps.length) lines.push(`평균 랩 ${mark(Math.round(laps.reduce((a, b) => a + b, 0) / laps.length))}`);
+      lines.push("랩\t랩 타임\t누적");
+      laps.forEach((l, i) => lines.push(`${i + 1}\t${mark(l)}\t${mark(sc[i])}`));
+      const tail = pausedTail();
+      if (tail) lines.push(`${laps.length + 1}(정지)\t${mark(tail.lap)}\t${mark(tail.split)}`);
+      return lines.join("\n");
+    }
+
+    async function copyRecord() {
+      const text = recordText();
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      showToast("기록을 복사했어요", false);
+    }
+
+    mainBtn.addEventListener("click", () => (running ? lap() : start()));
+    sideBtn.addEventListener("click", () => (running ? stop() : reset()));
+    toastAction.addEventListener("click", undo);
+    copyBtn.addEventListener("click", copyRecord);
+    themeBtn.addEventListener("click", () => {
+      setTheme(document.documentElement.dataset.theme === "outdoor" ? "" : "outdoor");
+      save();
+    });
 
     document.addEventListener("keydown", (e) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      // e.code is layout-independent, so shortcuts also work with a Korean IME
       if (e.code === "Space") {
         e.preventDefault();
-        toggle();
-      } else if (e.key === "l" || e.key === "L") {
+        running ? stop() : start();
+      } else if (e.code === "KeyL") {
         lap();
-      } else if (e.key === "r" || e.key === "R") {
+      } else if (e.code === "KeyR") {
         reset();
       }
     });
+
+    document.addEventListener("visibilitychange", () => {
+      if (running && document.visibilityState === "visible") requestWakeLock();
+    });
+
+    restore();
+    renderAll();
   </script>
 </body>
 </html>
